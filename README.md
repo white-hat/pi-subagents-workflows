@@ -28,7 +28,7 @@ Execution stays with pi-subagents: this package stores workflows, validates thei
 
 - Node 22.19 or newer
 - Pi 0.83 or newer
-- pi-subagents 0.42.1 or newer, loaded in the same parent session
+- pi-subagents 0.43.0 or newer, loaded in the same parent session
 
 Install both packages, then reload Pi:
 

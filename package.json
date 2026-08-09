@@ -1,6 +1,6 @@
 {
   "name": "pi-subagents-workflows",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Saved workflow registry and runner for pi-subagents workflowScript orchestration",
   "author": "Eli <i@whitehat.com.ua>",
   "license": "MIT",
