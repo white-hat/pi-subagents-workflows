@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   id-token: write
 
 concurrency:
@@ -28,3 +28,9 @@ jobs:
         run: npm test
       - name: Publish to npm
         run: npm publish --provenance --access public
+      - name: Tag and create GitHub Release
+        run: |
+          version="v$(node -p "require('./package.json').version")"
+          gh release create "$version" --title "$version" --generate-notes --target "$GITHUB_SHA"
+        env:
+          GH_TOKEN: ${{ github.token }}
