@@ -1,0 +1,13 @@
+node_modules/
+coverage/
+*.tgz
+.DS_Store
+
+# Secrets and logs
+.env
+.env.*
+*.log
+
+# Agent scratch state
+.claude/
+.codegraph/
