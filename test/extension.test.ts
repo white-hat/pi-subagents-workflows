@@ -41,7 +41,20 @@ test("command parser accepts list, show, and JSON run arguments", () => {
     name: "review",
     args: { target: "src" },
   });
-  assert.throws(() => parseWorkflowCommand("run review nope"), /JSON object/i);
+  assert.deepEqual(parseWorkflowCommand("run review target=src/auth"), {
+    action: "run",
+    name: "review",
+    args: { target: "src/auth" },
+  });
+  assert.deepEqual(
+    parseWorkflowCommand(`run review target="src/my auth" depth=3 strict=true note='a=b'`),
+    {
+      action: "run",
+      name: "review",
+      args: { target: "src/my auth", depth: 3, strict: true, note: "a=b" },
+    },
+  );
+  assert.throws(() => parseWorkflowCommand("run review nope"), /key=value/i);
 });
 
 test("registered tool discovers and launches a saved workflow through pi-subagents RPC", async () => {
@@ -55,6 +68,7 @@ test("registered tool discovers and launches a saved workflow through pi-subagen
     events,
     registerTool(tool: typeof registeredTool) { registeredTool = tool; },
     registerCommand(name: string) { commands.push(name); },
+    on() {},
   };
   events.on("subagents:rpc:v1:request", (raw) => {
     const request = raw as { requestId: string };
@@ -69,7 +83,7 @@ test("registered tool discovers and launches a saved workflow through pi-subagen
   registerWorkflowExtension(pi as never, { packageRoot: join(root, "package"), userRoot });
 
   assert.ok(registeredTool);
-  assert.deepEqual(commands, ["subagent-workflow"]);
+  assert.deepEqual(commands, ["workflow"]);
   const ctx = {
     cwd: join(root, "project"),
     isProjectTrusted: () => true,
@@ -104,6 +118,7 @@ test("project discovery does not walk into an unverified ancestor", async () => 
     events,
     registerTool(tool: typeof registeredTool) { registeredTool = tool; },
     registerCommand() {},
+    on() {},
   } as never, { packageRoot: join(root, "package"), userRoot: join(root, "user") });
 
   const result = await registeredTool!.execute(
@@ -118,6 +133,31 @@ test("project discovery does not walk into an unverified ancestor", async () => 
   assert.doesNotMatch(result.content[0].text, /review/);
 });
 
+test("slash command completes workflow names and parameters after session start", () => {
+  const root = mkdtempSync(join(tmpdir(), "pi-subagents-workflows-complete-"));
+  const userRoot = join(root, "user");
+  createWorkflow(userRoot);
+  let command: { getArgumentCompletions?: (prefix: string) => unknown } | undefined;
+  let sessionStart: ((event: unknown, ctx: unknown) => void) | undefined;
+  registerWorkflowExtension({
+    events: new Events(),
+    registerTool() {},
+    registerCommand(_name: string, options: typeof command) { command = options; },
+    on(event: string, handler: typeof sessionStart) {
+      if (event === "session_start") sessionStart = handler;
+    },
+  } as never, { packageRoot: join(root, "package"), userRoot });
+
+  assert.equal(command?.getArgumentCompletions?.("run "), null, "no cwd before session start");
+  sessionStart?.({}, { cwd: root, isProjectTrusted: () => false });
+  assert.deepEqual(command?.getArgumentCompletions?.("run rev"), [
+    { value: "run review ", label: "review", description: "user: Review a target" },
+  ]);
+  assert.deepEqual(command?.getArgumentCompletions?.("run review "), [
+    { value: "run review target=", label: "target=", description: "string · required" },
+  ]);
+});
+
 test("extension does not register inside a pi-subagents child", () => {
   const previous = process.env.PI_SUBAGENT_CHILD;
   process.env.PI_SUBAGENT_CHILD = "1";
@@ -127,6 +167,7 @@ test("extension does not register inside a pi-subagents child", () => {
       events: new Events(),
       registerTool() { calls.push("tool"); },
       registerCommand() { calls.push("command"); },
+      on() {},
     } as never);
   } finally {
     if (previous === undefined) delete process.env.PI_SUBAGENT_CHILD;

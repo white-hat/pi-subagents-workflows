@@ -17,7 +17,7 @@ review/
 Drop that anywhere the registry looks — alongside this package, in your home directory, or in a repository — and it becomes callable by name, by you or by the agent:
 
 ```text
-/subagent-workflow run review {"target":"src/auth"}
+/workflow run review target=src/auth
 ```
 
 Arguments are validated against the manifest before anything launches, so a typo fails immediately instead of halfway through a fan-out. Project-scoped workflows live in the repository they serve, which means an orchestration your team relies on — a review panel, a migration sweep, a research fan-out — is version-controlled and reviewable like the rest of the code.
@@ -61,10 +61,16 @@ pi_subagent_workflow({
 Humans can use the slash command:
 
 ```text
-/subagent-workflow list
-/subagent-workflow show review
-/subagent-workflow run review {"target":"src/auth"}
+/workflow list
+/workflow show review
+/workflow run review target=src/auth depth=3 strict=true
+/workflow run review target="src/my auth"
+/workflow run review {"target":"src/auth"}
 ```
+
+Tab completion covers the action, then the workflow name, then the workflow's own parameter names as `key=` — annotated with type, requiredness, and description, and skipping keys already typed.
+
+Run arguments accept `key=value` pairs or a JSON object. Values are read as JSON when they parse (`3`, `true`, `null`, `["a","b"]`) and as plain strings otherwise; double or single quotes keep spaces, and single quotes keep the text verbatim.
 
 Runs are detached and appear in pi-subagents status, artifacts, and FleetView.
 

@@ -12,6 +12,7 @@ import { StringEnum } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
 
 import { parseWorkflowCommand } from "./src/command.ts";
+import { completeWorkflowArguments } from "./src/completion.ts";
 import { discoverWorkflows, type WorkflowRoots } from "./src/registry.ts";
 import { executeWorkflowRequest, type WorkflowRequest } from "./src/service.ts";
 
@@ -97,9 +98,24 @@ export default function registerWorkflowExtension(
     },
   });
 
-  pi.registerCommand("subagent-workflow", {
+  let completionContext: Pick<ExtensionContext, "cwd" | "isProjectTrusted"> | undefined;
+  pi.on("session_start", (_event, ctx) => {
+    completionContext = { cwd: ctx.cwd, isProjectTrusted: () => ctx.isProjectTrusted() };
+  });
+
+  pi.registerCommand("workflow", {
     description: "List, inspect, or run saved pi-subagents workflows",
+    getArgumentCompletions: (argumentPrefix) => {
+      if (!completionContext) return null;
+      try {
+        const { workflows } = registryForContext(completionContext, options);
+        return completeWorkflowArguments(argumentPrefix, [...workflows.values()]);
+      } catch {
+        return null;
+      }
+    },
     handler: async (rawArguments, ctx) => {
+      completionContext = { cwd: ctx.cwd, isProjectTrusted: () => ctx.isProjectTrusted() };
       try {
         const request = parseWorkflowCommand(rawArguments);
         const result = await executeWorkflowRequest(request, {
