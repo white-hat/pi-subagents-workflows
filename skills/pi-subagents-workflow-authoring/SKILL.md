@@ -23,15 +23,15 @@ Do not copy those references into a workflow or expand this skill with a second 
 1. Choose package, user, or project scope and modify the workflow at the scope that is actually discovered. Do not mirror it into another repository or scope unless explicitly requested.
 2. Write down the requested topology and implement exactly that topology with the simplest data flow possible. For example, “three discoverers, one reviewer, one reporter” means five child runs: one parallel discovery wave, one review step consuming those outputs, and one report step consuming the review.
 3. Inspect existing workflows with `pi_subagent_workflow({ action: "list" })`, inspect the same-name or nearest example, and run `subagent({ action: "list" })` before choosing agents. Use only confirmed executable agents.
-4. Create or update `<scope>/<name>/workflow.json`, `<scope>/<name>/script.js`, and `<scope>/<name>/README.md`. Keep the directory name and manifest `name` identical.
+4. Create or update `<scope>/<name>/workflow.json`, `<scope>/<name>/script.js`, and `<scope>/<name>/README.md`. Keep the directory name and manifest `name` identical. Every workflow README must contain a fenced `mermaid` diagram that matches the executable topology, including every conditional lane, gate, loop, and terminal outcome that can occur.
 5. Declare every caller-supplied value in `parameters`. Treat `args` as type-validated input, add semantic validation in `script.js`, and pass `cwd` explicitly to every child.
 6. Write `script.js` as a `workflowScript` statement body with stable keys, direct data flow, and an explicit JSON-compatible `return`. Do not add imports, exports, Node APIs, host globals, retries, custom agents, custom tools, extensions, worktrees, persistence, or extra roles unless the requested behavior requires them.
 7. Choose the smallest reliable output contract for each child. Keep human-readable evidence as prose. Use an object-root `outputSchema` whenever downstream orchestration needs machine-readable values, branching decisions, paths, findings, verdicts, or coverage.
 8. Consume schema-bound results from `result.structuredOutput`, never by parsing `result.output`. Keep deterministic semantic checks for invariants JSON Schema does not express cleanly, such as unique IDs, cross-array coverage, acyclic dependencies, and verdict/error consistency.
 9. Check every child result before consuming it. A failed `runs.run` rejects unless caught. `runs.all` settles all lanes and can return failed records, so check `run.error` and the required prose or `structuredOutput` field for every lane.
-10. Add only enough failure reporting to return truthful status and coverage. Failed or malformed lanes must not disappear, but do not build a retry framework around hypothetical failures.
-11. Document the exact topology, agents, parameters, prose and structured contracts, returned fields, side effects, and failure behavior in the README.
-12. Verify argument validation, syntax, LSP diagnostics, registry discovery, Markdown diagrams, deterministic orchestration, the structured-output recovery path, and a real end-to-end fixture.
+10. Add only enough failure reporting to return truthful status and coverage. A success status must mean the workflow's declared final gates passed, not merely that orchestration reached its return statement. When a workflow can exhaust a bounded recovery path, its result must distinguish that outcome from success. Failed or malformed lanes must not disappear.
+11. Document the exact topology, agents, parameters, prose and structured contracts, returned fields, side effects, failure behavior, and terminal status semantics in the README. Include the mandatory fenced `mermaid` diagram matching the executable topology.
+12. Verify argument validation, syntax, LSP diagnostics, registry discovery, deterministic orchestration, and a real end-to-end fixture. When the workflow has schema-bound children that use tools, also verify structured-output recovery after a harmless failed probe. Render each changed workflow README, plus any explicitly requested broader set, with the repository-approved Mermaid validator; when that validator is `merman-cli`, run `merman-cli -i <README.md> --artefacts <output-directory>`. A missing or invalid Mermaid diagram fails verification.
 13. Wait for real runs to terminate. Verify the exact child topology, expected result, final status, coverage, source diff, and absence of active children. Stop an irrecoverably failed top-level async run instead of leaving it half-dead.
 
 ## Output contracts
@@ -123,6 +123,15 @@ If the probe fails despite a successful `structured_output` tool call, the loade
 
 Prompts should say that failed probes are evidence: recover, use another method when useful, and still return the requested prose or structured result. Do not special-case one failing command.
 
+## Contract changes and recovery
+
+- Before changing parameters or result fields, discover every consumer in manifests, scripts, prompt wrappers, continuation strings, READMEs, and related workflows. Modify only the authorized scope. If correctness requires changing a consumer outside that scope, report the dependency or request authorization instead of silently editing or mirroring it.
+- Keep one authoritative machine-consumed representation of each operational input or state value. Do not add a second handoff artifact that merely duplicates another authoritative input; use structured handoffs only for independent machine state or an explicit compatibility contract. README prose and diagrams may summarize the manifest and script, which remain authoritative for executable behavior.
+- Add retries or repair loops only when the requested workflow requires them. Bound every loop, give each launched child a unique stable key, and define what happens when the budget is exhausted.
+- A mutation agent's report is not independent verification. If the workflow promises a verified result, run the applicable read-only gate after the final mutation and base terminal status on that gate.
+- Make primary result fields describe the final state. Preserve earlier attempts only when callers need diagnostic history or coverage.
+- Deterministic harnesses must execute every applicable branch, including success, degraded/failure outcomes, and any configured recovery path. Parsing alone does not prove runtime helpers, branching, or result semantics are correct.
+
 ## Prompt and file guidance
 
 - Identify optional files before a writer reads them. Tell the writer which files may be absent, which may be created, and which paths it owns.
@@ -151,9 +160,9 @@ Prompts should say that failed probes are evidence: recover, use another method 
 - Every `script.js` parses as a workflowScript body; focused LSP and repository checks pass.
 - Markdown Mermaid diagrams render successfully with the repository-approved validator.
 - Every required fanout lane returns usable prose or structured output; failed and skipped lanes cannot disappear from coverage.
-- The focused missing-tool-error recovery probe succeeds with `structuredOutput` present.
+- When schema-bound children use tools, the focused missing-tool-error recovery probe succeeds with `structuredOutput` present.
 - A deterministic mocked harness may verify keys, topology, schemas, branching, and semantic guards, but remains supplementary.
-- The real fixture uses the exact requested roles and order, exercises one expected finding or edit plus a harmless recoverable probe, and produces the expected observable result.
+- The real fixture uses the exact requested roles and order, exercises one expected finding or edit, and produces the expected observable result. When schema-bound children use tools, include a harmless recoverable probe.
 - Read-only workflows leave fixture source files and staged diffs unchanged. Treat documented `.pi-subagents/` artifacts separately from product mutations.
 - Mutation workflows change only authorized paths and preserve unrelated user changes.
 - The final status and coverage are truthful, no required role is hidden, and pi-subagents reports no active child or workflow left behind.

@@ -11,3 +11,4 @@ coverage/
 # Agent scratch state
 .claude/
 .codegraph/
+.pi-subagents/
